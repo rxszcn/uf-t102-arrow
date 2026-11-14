@@ -5,6 +5,7 @@ Changelog
 ------------------
 
 - [ADDED] Added ``week_start`` parameter to ``floor()`` and ``ceil()`` methods. `PR #1222 <https://github.com/arrow-py/arrow/pull/1222>`_
+- [ADDED] Added ``week_start`` parameter to ``span_range()`` and ``interval()`` methods.
 - [ADDED] Added ``FORMAT_RFC3339_STRICT`` with a T separator. `PR #1201 <https://github.com/arrow-py/arrow/pull/1201>`_
 - [ADDED] Added Macedonian in Latin locale support. `PR #1200 <https://github.com/arrow-py/arrow/pull/1200>`_
 - [ADDED] Added Persian/Farsi locale support. `PR #1190 <https://github.com/arrow-py/arrow/pull/1190>`_

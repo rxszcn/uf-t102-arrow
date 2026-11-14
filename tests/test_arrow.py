@@ -1142,7 +1142,98 @@ class TestArrowRange:
         ]
 
 
+def _week_spans(first_floor, end):
+    """Builds consecutive 7-day week spans starting at an explicit golden floor date."""
+    result = []
+    floor = arrow.Arrow(*first_floor)
+    while floor <= arrow.Arrow(*end):
+        ceil = floor.shift(days=6).replace(
+            hour=23, minute=59, second=59, microsecond=999999
+        )
+        result.append((floor, ceil))
+        floor = floor.shift(days=7)
+    return result
+
+
 class TestArrowSpanRange:
+    def test_week_start_default_matches_monday(self):
+        start, end = datetime(2013, 2, 2), datetime(2013, 2, 28)
+
+        assert list(arrow.Arrow.span_range("week", start, end)) == list(
+            arrow.Arrow.span_range("week", start, end, week_start=1)
+        )
+
+    @pytest.mark.parametrize(
+        "week_start, first_floor",
+        [
+            pytest.param(1, (2013, 1, 28), id="monday"),
+            pytest.param(2, (2013, 1, 29), id="tuesday"),
+            pytest.param(3, (2013, 1, 30), id="wednesday"),
+            pytest.param(4, (2013, 1, 24), id="thursday"),
+            pytest.param(5, (2013, 1, 25), id="friday"),
+            pytest.param(6, (2013, 1, 26), id="saturday"),
+            pytest.param(7, (2013, 1, 27), id="sunday"),
+        ],
+    )
+    def test_week_start_cross_month(self, week_start, first_floor):
+        start, end = datetime(2013, 1, 30), datetime(2013, 2, 13)
+
+        result = list(arrow.Arrow.span_range("week", start, end, week_start=week_start))
+
+        assert result == _week_spans(first_floor, (2013, 2, 13))
+
+    @pytest.mark.parametrize(
+        "week_start, first_floor",
+        [
+            pytest.param(1, (2012, 12, 24), id="monday"),
+            pytest.param(2, (2012, 12, 25), id="tuesday"),
+            pytest.param(3, (2012, 12, 26), id="wednesday"),
+            pytest.param(4, (2012, 12, 20), id="thursday"),
+            pytest.param(5, (2012, 12, 21), id="friday"),
+            pytest.param(6, (2012, 12, 22), id="saturday"),
+            pytest.param(7, (2012, 12, 23), id="sunday"),
+        ],
+    )
+    def test_week_start_cross_year(self, week_start, first_floor):
+        start, end = datetime(2012, 12, 26), datetime(2013, 1, 8)
+
+        result = list(arrow.Arrow.span_range("week", start, end, week_start=week_start))
+
+        assert result == _week_spans(first_floor, (2013, 1, 8))
+
+    @pytest.mark.parametrize("week_start", range(1, 8))
+    def test_week_start_matches_single_span(self, week_start):
+        start, end = datetime(2013, 1, 30), datetime(2013, 2, 13)
+
+        for floor, ceil in arrow.Arrow.span_range(
+            "week", start, end, week_start=week_start
+        ):
+            assert (floor, ceil) == floor.span("week", week_start=week_start)
+            assert floor.isoweekday() == week_start
+
+    @pytest.mark.parametrize("week_start", [0, 8, -1])
+    def test_week_start_validation(self, week_start):
+        with pytest.raises(
+            ValueError, match="week_start argument must be between 1 and 7"
+        ):
+            list(
+                arrow.Arrow.span_range(
+                    "week",
+                    datetime(2013, 2, 2),
+                    datetime(2013, 2, 28),
+                    week_start=week_start,
+                )
+            )
+
+    @pytest.mark.parametrize("frame", ["year", "quarter", "month", "day", "hour"])
+    def test_week_start_ignored_for_non_week_frames(self, frame):
+        start, end = datetime(2013, 2, 2), datetime(2013, 2, 28)
+
+        assert list(arrow.Arrow.span_range(frame, start, end, week_start=7)) == list(
+            arrow.Arrow.span_range(frame, start, end)
+        )
+        list(arrow.Arrow.span_range(frame, start, end, week_start=0))
+
     def test_year(self):
         result = list(
             arrow.Arrow.span_range("year", datetime(2013, 2, 1), datetime(2016, 3, 31))
@@ -1556,6 +1647,15 @@ class TestArrowSpanRange:
         assert result == expected
 
 
+def _interval_week_spans(first_floor, end, interval):
+    """Merges consecutive golden week spans into groups of ``interval`` spans."""
+    weeks = _week_spans(first_floor, end)
+    return [
+        (weeks[i][0], weeks[min(i + interval, len(weeks)) - 1][1])
+        for i in range(0, len(weeks), interval)
+    ]
+
+
 class TestArrowInterval:
     def test_incorrect_input(self):
         with pytest.raises(ValueError):
@@ -1627,6 +1727,93 @@ class TestArrowInterval:
         ]
 
         assert result == expected
+
+    def test_week_start_default_matches_monday(self):
+        start, end = datetime(2013, 1, 30), datetime(2013, 2, 13)
+
+        assert list(arrow.Arrow.interval("week", start, end, 2)) == list(
+            arrow.Arrow.interval("week", start, end, 2, week_start=1)
+        )
+
+    @pytest.mark.parametrize(
+        "week_start, first_floor",
+        [
+            pytest.param(1, (2013, 1, 28), id="monday"),
+            pytest.param(2, (2013, 1, 29), id="tuesday"),
+            pytest.param(3, (2013, 1, 30), id="wednesday"),
+            pytest.param(4, (2013, 1, 24), id="thursday"),
+            pytest.param(5, (2013, 1, 25), id="friday"),
+            pytest.param(6, (2013, 1, 26), id="saturday"),
+            pytest.param(7, (2013, 1, 27), id="sunday"),
+        ],
+    )
+    def test_week_start_cross_month(self, week_start, first_floor):
+        start, end = datetime(2013, 1, 30), datetime(2013, 2, 13)
+
+        result = list(
+            arrow.Arrow.interval("week", start, end, 2, week_start=week_start)
+        )
+
+        assert result == _interval_week_spans(first_floor, (2013, 2, 13), 2)
+
+    @pytest.mark.parametrize(
+        "week_start, first_floor",
+        [
+            pytest.param(1, (2012, 12, 24), id="monday"),
+            pytest.param(2, (2012, 12, 25), id="tuesday"),
+            pytest.param(3, (2012, 12, 26), id="wednesday"),
+            pytest.param(4, (2012, 12, 20), id="thursday"),
+            pytest.param(5, (2012, 12, 21), id="friday"),
+            pytest.param(6, (2012, 12, 22), id="saturday"),
+            pytest.param(7, (2012, 12, 23), id="sunday"),
+        ],
+    )
+    def test_week_start_cross_year(self, week_start, first_floor):
+        start, end = datetime(2012, 12, 26), datetime(2013, 1, 8)
+
+        result = list(
+            arrow.Arrow.interval("week", start, end, 2, week_start=week_start)
+        )
+
+        assert result == _interval_week_spans(first_floor, (2013, 1, 8), 2)
+
+    @pytest.mark.parametrize("week_start", range(1, 8))
+    def test_week_start_matches_span_range(self, week_start):
+        start, end = datetime(2013, 1, 30), datetime(2013, 2, 13)
+
+        from_span_range = list(
+            arrow.Arrow.span_range("week", start, end, week_start=week_start)
+        )
+        from_interval = list(
+            arrow.Arrow.interval("week", start, end, week_start=week_start)
+        )
+
+        assert from_interval == from_span_range
+        for floor, ceil in from_interval:
+            assert floor.isoweekday() == week_start
+
+    @pytest.mark.parametrize("week_start", [0, 8, -1])
+    def test_week_start_validation(self, week_start):
+        with pytest.raises(
+            ValueError, match="week_start argument must be between 1 and 7"
+        ):
+            list(
+                arrow.Arrow.interval(
+                    "week",
+                    datetime(2013, 2, 2),
+                    datetime(2013, 2, 28),
+                    week_start=week_start,
+                )
+            )
+
+    @pytest.mark.parametrize("frame", ["year", "quarter", "month", "day", "hour"])
+    def test_week_start_ignored_for_non_week_frames(self, frame):
+        start, end = datetime(2013, 2, 2), datetime(2013, 2, 28)
+
+        assert list(arrow.Arrow.interval(frame, start, end, 2, week_start=7)) == list(
+            arrow.Arrow.interval(frame, start, end, 2)
+        )
+        list(arrow.Arrow.interval(frame, start, end, 2, week_start=0))
 
 
 @pytest.mark.usefixtures("time_2013_02_15")

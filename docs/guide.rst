@@ -324,6 +324,20 @@ You can also get a range of time spans:
     (<Arrow [2013-05-05T15:00:00+00:00]>, <Arrow [2013-05-05T15:59:59.999999+00:00]>)
     (<Arrow [2013-05-05T16:00:00+00:00]>, <Arrow [2013-05-05T16:59:59.999999+00:00]>)
 
+Week spans honor the same ``week_start`` argument as ``span``, ``floor`` and ``ceil``,
+including for consecutive spans produced by ``span_range`` and ``interval``:
+
+.. code-block:: python
+
+    >>> start = datetime(2013, 5, 5)
+    >>> end = datetime(2013, 5, 20)
+    >>> for r in arrow.Arrow.span_range('week', start, end, week_start=6):
+    ...     print(r)
+    ...
+    (<Arrow [2013-05-04T00:00:00+00:00]>, <Arrow [2013-05-10T23:59:59.999999+00:00]>)
+    (<Arrow [2013-05-11T00:00:00+00:00]>, <Arrow [2013-05-17T23:59:59.999999+00:00]>)
+    (<Arrow [2013-05-18T00:00:00+00:00]>, <Arrow [2013-05-24T23:59:59.999999+00:00]>)
+
 Or just iterate over a range of time:
 
 .. code-block:: python
